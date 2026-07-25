@@ -742,8 +742,8 @@ function App() {
             </button>
           </header>
           <main className="landing-hero">
-            <h1 className="hero-title">Tu creatividad,<br/><span className="gradient-text">sin limites</span></h1>
-            <p className="hero-subtitle">La herramienta de diseno mas intuitiva para crear lo que imagines. Sin complicaciones, sin curva de aprendizaje.</p>
+            <h1 className="hero-title">Diseña de forma<br/><span className="gradient-text">intuitiva</span></h1>
+            <p className="hero-subtitle">Editor de diseño 100% open source. Creá, editá y exportá sin limites. Simple, rápido y gratuito.</p>
             <div className="hero-actions">
               <button className="btn-hero btn-primary" onClick={() => setShowModal(true)}>Comenzar ahora</button>
               <button className="btn-hero btn-secondary" onClick={() => alert('Contacto y precios - Proximamente')}>Contacto y precios</button>

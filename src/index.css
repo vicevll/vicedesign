@@ -251,6 +251,10 @@ html.dark .btn-secondary { background:var(--bg-elevated); border-color:var(--bor
 html.dark .btn-secondary:hover { background:var(--bg-hover); }
 
 /* ===== RESPONSIVE ===== */
+/* Base: hide mobile-only elements */
+.mobile-menu-btn { display:none; }
+.mobile-overlay { display:none; }
+
 /* Tablet */
 @media (max-width: 1024px) {
   #editor-screen, .editor { grid-template-columns: 1fr 220px; }
@@ -290,6 +294,10 @@ html.dark .btn-secondary:hover { background:var(--bg-hover); }
   .topbar-btn { padding:4px 8px; font-size:11px; }
   .topbar-tool-divider { display:none; }
   .zoom-level { display:none; }
+
+  /* Mobile menu buttons */
+  .mobile-menu-btn { display:flex; }
+  .mobile-overlay.mobile-open { display:block; position:fixed; inset:0; background:rgba(0,0,0,0.3); z-index:199; }
 
   /* Landing page */
   .landing-header { padding:14px 16px; }
