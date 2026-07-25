@@ -686,14 +686,14 @@ function App() {
     try {
       const u = await loginUser(authEmail, authPass);
       if (!u) { setAuthError('Email o contraseña incorrectos'); return; }
-      setUser(u); setAuthScreen(null); setAuthError('');
+      setUser(u); setAuthScreen('dashboard'); setAuthError('');
     } catch { setAuthError('Credenciales invalidas'); }
   };
   const handleSignup = async () => {
     try {
       const u = await signupUser(authEmail, authPass, authName);
       if (!u) { setAuthError('El email ya esta registrado'); return; }
-      if (u.id) { setUser(u); setAuthScreen(null); setAuthError(''); }
+      if (u.id) { setUser(u); setAuthScreen('dashboard'); setAuthError(''); }
       else { setAuthError('Cuenta creada. Revisa tu email para confirmar.'); }
     } catch { setAuthError('Error al crear cuenta'); }
   };
@@ -708,10 +708,11 @@ function App() {
     import('./utils/db').then(async ({ supabase, getSession }) => {
       if (!supabase) return;
       const u = await getSession();
-      if (u) setUser(u);
+      if (u) { setUser(u); setAuthScreen('dashboard'); }
       supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
           setUser({ id: session.user.id, email: session.user.email, name: session.user.user_metadata?.full_name || '' });
+          setAuthScreen('dashboard');
         } else if (event === 'SIGNED_OUT') {
           setUser(null);
         }
@@ -841,7 +842,7 @@ function App() {
             <h1 className="hero-title">Diseña de forma<br/><span className="gradient-text">intuitiva</span></h1>
             <p className="hero-subtitle">Editor de diseño 100% open source. Creá, editá y exportá sin limites. Simple, rápido y gratuito.</p>
             <div className="hero-actions">
-              <button className="btn-hero btn-primary" onClick={() => setShowModal(true)}>Comenzar ahora</button>
+              <button className="btn-hero btn-primary" onClick={() => { setAuthEmail(''); setAuthPass(''); setAuthError(''); setAuthScreen('login'); }}>Comenzar ahora</button>
               <button className="btn-hero btn-secondary" onClick={() => alert('Contacto y precios - Proximamente')}>Contacto y precios</button>
             </div>
           </main>
