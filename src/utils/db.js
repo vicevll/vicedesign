@@ -3,7 +3,15 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 
-export const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
+let supabaseClient = null
+try {
+  if (supabaseUrl && supabaseKey && supabaseUrl.startsWith('http')) {
+    supabaseClient = createClient(supabaseUrl, supabaseKey)
+  }
+} catch (e) { console.warn('Supabase init failed:', e) }
+
+export const supabase = supabaseClient
+export function getSupabase() { return supabaseClient }
 
 export function isSupabaseReady() {
   return !!supabase

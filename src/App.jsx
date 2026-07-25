@@ -5,7 +5,7 @@ import {
   sanitizeText, sanitizeSVG,
 } from './utils/canvas';
 import { jsPDF } from 'jspdf';
-import { saveProject, loadProject, listProjects, deleteProject, getSession, signupUser, loginUser, logoutUser, loginWithGoogle, isSupabaseReady } from './utils/db';
+import { saveProject, loadProject, listProjects, deleteProject, getSession, signupUser, loginUser, logoutUser, loginWithGoogle, isSupabaseReady, getSupabase } from './utils/db';
 
 // ============================================================
 const FONTS = ['Inter Tight','Roboto','Open Sans','Montserrat','Playfair Display','Poppins','Lato','Raleway','Merriweather','Nunito'];
@@ -705,11 +705,12 @@ function App() {
   };
   // Auth state listener (handles OAuth redirect)
   useEffect(() => {
-    import('./utils/db').then(async ({ supabase, getSession }) => {
-      if (!supabase) return;
+    (async () => {
+      const sb = getSupabase();
+      if (!sb) return;
       const u = await getSession();
       if (u) { setUser(u); setAuthScreen('dashboard'); }
-      supabase.auth.onAuthStateChange((event, session) => {
+      sb.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
           setUser({ id: session.user.id, email: session.user.email, name: session.user.user_metadata?.full_name || '' });
           setAuthScreen('dashboard');
@@ -717,7 +718,7 @@ function App() {
           setUser(null);
         }
       });
-    });
+    })();
   }, []);
 
   // ---- Auto-save (debounced, only in editor) ----
