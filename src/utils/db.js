@@ -34,6 +34,13 @@ export async function logoutUser() {
   if (supabase) await supabase.auth.signOut()
 }
 
+export async function loginWithGoogle() {
+  if (!supabase) return
+  const { data, error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
+  if (error) throw error
+  return data
+}
+
 // === Projects ===
 export async function saveProject(project) {
   if (!supabase) return
