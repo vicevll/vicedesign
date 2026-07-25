@@ -184,3 +184,25 @@ export function isInsideLayer(layer, imgX, imgY, canvasW, canvasH) {
   const b = getLayerBounds(layer, canvasW, canvasH);
   return imgX >= b.x && imgX <= b.x + b.w && imgY >= b.y && imgY <= b.y + b.h;
 }
+
+// ---- Security sanitization ----
+export function sanitizeText(str) {
+  if (!str) return '';
+  let s = str.replace(/<[^>]*>/g, '')
+    .replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/\bon\w+\s*=\s*[^\s>]+/gi, '')
+    .replace(/javascript\s*:/gi, '')
+    .replace(/data:[\s\S]*?base64[\s\S]*?/gi, '[base64]');
+  if (s.length > 5000) s = s.substring(0, 5000);
+  return s;
+}
+
+export function sanitizeSVG(svgText) {
+  if (!svgText) return '';
+  return svgText
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/\bon\w+\s*=\s*[^\s>]+/gi, '')
+    .replace(/javascript\s*:/gi, '')
+    .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, '');
+}

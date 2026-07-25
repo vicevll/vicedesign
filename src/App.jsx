@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from
 import {
   generateId, clamp, hslToRgb, rgbToHex, hexToRgb,
   createSolidImageData, renderShapeLayer, getLayerBounds, isInsideLayer,
+  sanitizeText, sanitizeSVG,
 } from './utils/canvas';
 import { jsPDF } from 'jspdf';
 
@@ -433,7 +434,7 @@ function App() {
   // ---- Text editing ----
   const commitText = useCallback(() => {
     if (!editingText) return;
-    const raw = document.getElementById('text-editor-input')?.value || '';
+    const raw = sanitizeText(document.getElementById('text-editor-input')?.value || '');
     const txt = raw.trimEnd();
     updateSlide(s => ({ ...s, layers: s.layers.map(l => l.id===editingText.layerId ? {...l, text: txt, name: txt.substring(0,20) || 'Texto'} : l) }));
     setEditingText(null);
@@ -497,7 +498,7 @@ function App() {
     fetch(svgPath).then(r => r.text()).then(svgText => {
       let fixed = svgText;
       if (!fixed.includes('width=')) fixed = fixed.replace('<svg', '<svg width="200" height="200"');
-      const colored = fixed.replace(/currentColor/g, color || '#6366f1');
+      const colored = sanitizeSVG(fixed).replace(/currentColor/g, color || '#6366f1');
       const blob = new Blob([colored], { type: 'image/svg+xml' });
       const url = URL.createObjectURL(blob);
       const img = new Image();
@@ -813,7 +814,7 @@ function App() {
           <div className="topbar-spacer" />
           {/* Project name */}
           <input className="topbar-project-name" value={projectName}
-            onChange={e => setProjectName(e.target.value)}
+            onChange={e => setProjectName(sanitizeText(e.target.value))}
             title="Nombre del proyecto" />
           {/* Home button */}
           <button className="topbar-btn" onClick={() => { if (editingText) commitText(); setScreen('landing'); }} title="Inicio">
@@ -904,7 +905,7 @@ function App() {
           zoom={zoom}
           onCommit={commitText} onCancel={cancelText}
           onChange={(txt) => {
-            updateSlide(s => ({ ...s, layers: s.layers.map(l => l.id===editingText.layerId ? {...l, text: txt||'', name: (txt||'Texto').trimEnd().substring(0,20)} : l) }));
+            updateSlide(s => ({ ...s, layers: s.layers.map(l => l.id===editingText.layerId ? {...l, text: sanitizeText(txt||''), name: sanitizeText(txt||'Texto').trimEnd().substring(0,20)} : l) }));
           }}
         />
       )}
