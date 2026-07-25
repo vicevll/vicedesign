@@ -237,52 +237,6 @@ function App() {
     return null;
   }
 
-  // ---- Touch handlers (delegate to mouse) ----
-  const touchRef = useRef(null); // { lastDist, lastX, lastY, pinchZoom }
-
-  const handleTouchStart = useCallback((e) => {
-    if (e.touches.length === 1) {
-      const t = e.touches[0];
-      handleCanvasDown({ button: 0, clientX: t.clientX, clientY: t.clientY, altKey: false, preventDefault: () => {} });
-    } else if (e.touches.length === 2) {
-      const dx = e.touches[1].clientX - e.touches[0].clientX;
-      const dy = e.touches[1].clientY - e.touches[0].clientY;
-      const dist = Math.hypot(dx, dy);
-      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      touchRef.current = { lastDist: dist, cx, cy, pinchZoom: true };
-    }
-    e.preventDefault();
-  }, [handleCanvasDown]);
-
-  const handleTouchMove = useCallback((e) => {
-    e.preventDefault();
-    if (e.touches.length === 1 && touchRef.current?.pinchZoom) return;
-    if (e.touches.length === 1) {
-      const t = e.touches[0];
-      handleCanvasMove({ clientX: t.clientX, clientY: t.clientY, buttons: 1 });
-    } else if (e.touches.length === 2 && touchRef.current) {
-      const dx = e.touches[1].clientX - e.touches[0].clientX;
-      const dy = e.touches[1].clientY - e.touches[0].clientY;
-      const dist = Math.hypot(dx, dy);
-      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      if (touchRef.current.lastDist) {
-        const factor = dist / touchRef.current.lastDist;
-        applyZoom(factor, touchRef.current.cx, touchRef.current.cy);
-      }
-      if (touchRef.current.cx !== undefined) {
-        setPan(p => ({ x: p.x + (cx - touchRef.current.cx), y: p.y + (cy - touchRef.current.cy) }));
-      }
-      touchRef.current = { lastDist: dist, cx, cy, pinchZoom: true };
-    }
-  }, [handleCanvasMove, applyZoom, setPan]);
-
-  const handleTouchEnd = useCallback(() => {
-    handleCanvasUp();
-    touchRef.current = null;
-  }, [handleCanvasUp]);
-
   // ---- Canvas mouse events ----
   const canvasToImg = useCallback((cx, cy) => {
     const r = canvasRef.current?.getBoundingClientRect();
@@ -910,7 +864,6 @@ function App() {
               <canvas ref={canvasRef} width={slide?.width || 1920} height={slide?.height || 1080}
                 style={{ width: Math.round((slide?.width||1920) * zoom), height: Math.round((slide?.height||1080) * zoom), cursor: activeTool === 'text' || activeTool === 'image' ? 'crosshair' : 'default' }}
                 onMouseDown={handleCanvasDown} onMouseMove={handleCanvasMove} onMouseUp={handleCanvasUp} onMouseLeave={handleCanvasUp}
-                onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
                 onContextMenu={e => {
                   e.preventDefault();
                   const pos = canvasToImg(e.clientX, e.clientY);
