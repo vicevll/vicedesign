@@ -693,7 +693,8 @@ function App() {
     try {
       const u = await signupUser(authEmail, authPass, authName);
       if (!u) { setAuthError('El email ya esta registrado'); return; }
-      setAuthError('Cuenta creada. Revisa tu email para confirmar.');
+      if (u.id) { setUser(u); setAuthScreen(null); setAuthError(''); }
+      else { setAuthError('Cuenta creada. Revisa tu email para confirmar.'); }
     } catch { setAuthError('Error al crear cuenta'); }
   };
   const handleLogout = async () => { await logoutUser(); setUser(null); setAuthScreen(null); };
@@ -702,7 +703,21 @@ function App() {
       await loginWithGoogle();
     } catch {}
   };
-  useEffect(() => { getSession().then(u => { if (u) setUser(u); }); }, []);
+  // Auth state listener (handles OAuth redirect)
+  useEffect(() => {
+    import('./utils/db').then(async ({ supabase, getSession }) => {
+      if (!supabase) return;
+      const u = await getSession();
+      if (u) setUser(u);
+      supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          setUser({ id: session.user.id, email: session.user.email, name: session.user.user_metadata?.full_name || '' });
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+        }
+      });
+    });
+  }, []);
 
   // ---- Auto-save (debounced, only in editor) ----
   const saveTimerRef = useRef(null);
@@ -1454,7 +1469,7 @@ function AuthDashboard({ user, savedList, onRefresh, onLogout, onOpen, onNew }) 
         {!isSupabaseReady() && (
           <div style={{background:'rgba(245,158,11,0.1)',border:'1px solid var(--accent-orange)',borderRadius:'var(--radius-md)',padding:'14px 18px',marginBottom:20}}>
             <p style={{fontSize:13,color:'var(--text-pri)',fontWeight:600, marginBottom:4}}>Configura Supabase</p>
-            <p style={{fontSize:12,color:'var(--text-sec)',marginBottom:8}}>Agrega <strong>VITE_SUPABASE_URL</strong> y <strong>VITE_SUPABASE_ANON_KEY</strong> en Vercel (Settings > Environment Variables). Despues redeploy.</p>
+            <p style={{fontSize:12,color:'var(--text-sec)',marginBottom:8}}>Agrega <strong>VITE_SUPABASE_URL</strong> y <strong>VITE_SUPABASE_ANON_KEY</strong> en Vercel (Settings {'>'} Environment Variables). Despues redeploy.</p>
           </div>
         )}
         <button className="btn-hero btn-primary" onClick={onNew} style={{marginBottom:24,alignSelf:'flex-start'}}>+ Nuevo proyecto</button>
