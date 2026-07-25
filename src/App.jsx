@@ -5,6 +5,7 @@ import {
   sanitizeText, sanitizeSVG,
 } from './utils/canvas';
 import { jsPDF } from 'jspdf';
+import { saveProject, loadProject, listProjects, deleteProject, getAuthUser, setAuthUser, clearAuthUser, signupUser, loginUser } from './utils/db';
 
 // ============================================================
 const FONTS = ['Inter Tight','Roboto','Open Sans','Montserrat','Playfair Display','Poppins','Lato','Raleway','Merriweather','Nunito'];
@@ -51,6 +52,14 @@ function App() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [ctxMenu, setCtxMenu] = useState(null); // { x, y, layer }
   const [projectName, setProjectName] = useState('Sin titulo');
+  const [user, setUser] = useState(() => getAuthUser());
+  const [authScreen, setAuthScreen] = useState(null); // 'login' | 'signup' | 'dashboard'
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPass, setAuthPass] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [savedList, setSavedList] = useState([]);
+  const [currentProjectId, setCurrentProjectId] = useState(null);
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [mobileTools, setMobileTools] = useState(false);
 
@@ -672,6 +681,40 @@ function App() {
     pdf.save('vicedesign.pdf');
   }, [slides, renderSlideToCanvas]);
 
+  // ---- Auth helpers ----
+  const handleLogin = () => {
+    const u = loginUser(authEmail, authPass);
+    if (!u) { setAuthError('Email o contraseña incorrectos'); return; }
+    setUser(u); setAuthScreen(null); setAuthError('');
+  };
+  const handleSignup = () => {
+    const u = signupUser(authEmail, authPass, authName);
+    if (!u) { setAuthError('El email ya esta registrado'); return; }
+    setUser(u); setAuthScreen(null); setAuthError('');
+  };
+  const handleLogout = () => { clearAuthUser(); setUser(null); setAuthScreen(null); };
+
+  // ---- Auto-save (debounced, only in editor) ----
+  const saveTimerRef = useRef(null);
+  useEffect(() => {
+    if (screen !== 'editor' || !user) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      if (!slides[activeSlideIdx]) return;
+      const data = { id: currentProjectId || ('p_' + Date.now()), name: projectName, slides: slides, updatedAt: Date.now() };
+      if (!currentProjectId) setCurrentProjectId(data.id);
+      await saveProject(data);
+    }, 2000);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [screen, slides, projectName, user, currentProjectId, activeSlideIdx]);
+
+  // Load dashboard list
+  const refreshList = useCallback(async () => {
+    const list = await listProjects();
+    list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    setSavedList(list);
+  }, []);
+
   // ---- Landing anims ----
   useEffect(() => {
     if (screen !== 'landing') return;
@@ -724,7 +767,22 @@ function App() {
             </div>
           </div>
         )}
-        {showModal && (
+      {authScreen === 'dashboard' && user && (
+        <AuthDashboard
+          user={user} savedList={savedList} onRefresh={refreshList} onLogout={handleLogout}
+          onOpen={(id) => { loadProject(id).then(p => { if (p) { setSlides(p.slides); setProjectName(p.name); setCurrentProjectId(p.id); setScreen('editor'); } }); setAuthScreen(null); }}
+          onNew={() => { const s = createDefaultSlide(projW, projH, 'white'); setSlides([s]); setProjectName('Sin titulo'); setCurrentProjectId(null); setAuthScreen(null); setScreen('editor'); }}
+        />
+      )}
+      {authScreen === 'login' && (
+        <AuthForm type="login" email={authEmail} pass={authPass} error={authError}
+          onEmail={setAuthEmail} onPass={setAuthPass} onSubmit={handleLogin} onBack={() => setAuthScreen(null)} />
+      )}
+      {authScreen === 'signup' && (
+        <AuthForm type="signup" email={authEmail} pass={authPass} name={authName} error={authError}
+          onEmail={setAuthEmail} onPass={setAuthPass} onName={setAuthName} onSubmit={handleSignup} onBack={() => setAuthScreen(null)} />
+      )}
+      {showModal && (
           <SetupModal
             projW={projW} projH={projH} activePreset={activePreset}
             setProjW={setProjW} setProjH={setProjH} setActivePreset={setActivePreset}
@@ -738,6 +796,16 @@ function App() {
           <header className="landing-header">
             <span className="landing-logo">ViceDesign</span>
             <div style={{flex:1}} />
+            {user && (
+              <button className="landing-link" onClick={() => setAuthScreen('dashboard')}>Mis proyectos</button>
+            )}
+            {!user && (
+              <>
+                <button className="landing-link" onClick={() => { setAuthEmail(''); setAuthPass(''); setAuthError(''); setAuthScreen('login'); }}>Iniciar sesion</button>
+                <button className="landing-link" style={{background:'var(--accent)',color:'#fff',borderRadius:'var(--radius-sm)',padding:'6px 14px',fontWeight:600,fontSize:12}}
+                  onClick={() => { setAuthEmail(''); setAuthPass(''); setAuthName(''); setAuthError(''); setAuthScreen('signup'); }}>Crear cuenta</button>
+              </>
+            )}
             <button className="theme-toggle" onClick={() => setDark(d => !d)} title="Cambiar tema">
               {dark ? '\u2600' : '\u263E'}
             </button>
@@ -1311,6 +1379,71 @@ function TextOverlay({ editingText, layer, zoom, onCommit, onCancel, onChange })
         onKeyDown={e => { if (e.key==='Enter') { e.preventDefault(); onCommit(); } if (e.key==='Escape') { onCancel(); } }}
         onBlur={() => { if (mountedRef.current) setTimeout(onCommit, 150); }}
         placeholder="Escribe algo" />
+    </div>
+  );
+}
+
+function AuthForm({ type, email, pass, name, error, onEmail, onPass, onName, onSubmit, onBack }) {
+  return (
+    <div className="modal-overlay">
+      <div className="modal-card" style={{maxWidth:380}}>
+        <button className="modal-close" onClick={onBack}>&times;</button>
+        <h3 className="modal-title">{type === 'login' ? 'Iniciar sesion' : 'Crear cuenta'}</h3>
+        {error && <p style={{color:'var(--danger)',fontSize:13,textAlign:'center',marginBottom:12}}>{error}</p>}
+        <div className="modal-section">
+          {type === 'signup' && (
+            <div className="size-group" style={{marginBottom:12}}>
+              <label>Nombre</label>
+              <input type="text" value={name} onChange={e => onName(e.target.value)} placeholder="Tu nombre" style={{width:'100%',padding:'10px 12px',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',fontSize:14,outline:'none'}} />
+            </div>
+          )}
+          <div className="size-group" style={{marginBottom:12}}>
+            <label>Email</label>
+            <input type="email" value={email} onChange={e => onEmail(e.target.value)} placeholder="correo@ejemplo.com" style={{width:'100%',padding:'10px 12px',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',fontSize:14,outline:'none'}} />
+          </div>
+          <div className="size-group" style={{marginBottom:12}}>
+            <label>Contraseña</label>
+            <input type="password" value={pass} onChange={e => onPass(e.target.value)} placeholder="••••••••" style={{width:'100%',padding:'10px 12px',background:'var(--bg-secondary)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',fontSize:14,outline:'none'}} />
+          </div>
+          <button className="create-btn" onClick={onSubmit}>{type === 'login' ? 'Entrar' : 'Crear cuenta'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AuthDashboard({ user, savedList, onRefresh, onLogout, onOpen, onNew }) {
+  useEffect(() => { onRefresh(); }, [onRefresh]);
+  return (
+    <div className="landing" style={{background:'var(--bg-secondary)'}}>
+      <header className="landing-header">
+        <span className="landing-logo">ViceDesign</span>
+        <div style={{flex:1}} />
+        <span style={{fontSize:13,color:'var(--text-sec)',marginRight:12}}>{user?.name || user?.email}</span>
+        <button className="landing-link" onClick={onLogout} style={{fontSize:12,color:'var(--text-mut)'}}>Cerrar sesion</button>
+      </header>
+      <main style={{flex:1,display:'flex',flexDirection:'column',maxWidth:800,margin:'0 auto',padding:'40px 24px',width:'100%'}}>
+        <h2 style={{fontSize:28,fontWeight:700,marginBottom:8,color:'var(--text-pri)'}}>Mis proyectos</h2>
+        <p style={{fontSize:14,color:'var(--text-sec)',marginBottom:24}}>{savedList.length} proyecto{savedList.length !== 1 ? 's' : ''}</p>
+        <button className="btn-hero btn-primary" onClick={onNew} style={{marginBottom:24,alignSelf:'flex-start'}}>+ Nuevo proyecto</button>
+        {savedList.length === 0 && (
+          <p style={{fontSize:15,color:'var(--text-mut)',textAlign:'center',marginTop:60}}>Aun no tienes proyectos guardados</p>
+        )}
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {savedList.map(p => (
+            <div key={p.id} className="preset-btn" style={{flexDirection:'row',justifyContent:'space-between',padding:'14px 16px',background:'var(--bg-primary)'}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:600,color:'var(--text-pri)',marginBottom:2}}>{p.name || 'Sin titulo'}</div>
+                <div style={{fontSize:11,color:'var(--text-mut)'}}>{new Date(p.updatedAt || Date.now()).toLocaleDateString()} · {p.slides?.length || 1} slide{(p.slides?.length||1) > 1 ? 's' : ''}</div>
+              </div>
+              <div style={{display:'flex',gap:6}}>
+                <button className="topbar-btn" onClick={() => onOpen(p.id)} style={{background:'var(--accent)',color:'#fff',fontWeight:600}}>Abrir</button>
+                <button className="topbar-btn" onClick={async () => { await deleteProject(p.id); onRefresh(); }} style={{color:'var(--danger)'}}>Eliminar</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </main>
     </div>
   );
 }

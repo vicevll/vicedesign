@@ -56,6 +56,8 @@ select { cursor:pointer; background:var(--bg-secondary); border:1px solid var(--
 .blob-3 { width:200px; height:200px; top:50%; left:60%; background:rgba(236,72,153,0.06); opacity:0.5; }
 .landing-header { display:flex; align-items:center; padding:24px 44px; z-index:1; flex-shrink:0; }
 .landing-logo { font-size:22px; font-weight:700; letter-spacing:-0.4px; background:linear-gradient(135deg, var(--accent) 0%, var(--accent-purple) 100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+.landing-link { font-size:13px; color:var(--text-sec); padding:6px 12px; border-radius:var(--radius-sm); transition:all .15s; font-weight:500; background:transparent; border:none; cursor:pointer; }
+.landing-link:hover { background:var(--bg-hover); color:var(--text-pri); }
 .landing-hero { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; z-index:1; padding:0 24px 60px; max-width:680px; margin:0 auto; }
 .hero-title { font-size:clamp(40px, 7vw, 68px); font-weight:800; letter-spacing:-1.5px; line-height:1.08; color:var(--text-pri); }
 .gradient-text { background:linear-gradient(90deg, var(--accent), var(--accent-purple), var(--accent-pink), var(--accent), var(--accent-purple)); background-size:300% 100%; -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; animation:gradientShift 4s ease infinite; }
