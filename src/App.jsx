@@ -5,7 +5,7 @@ import {
   sanitizeText, sanitizeSVG,
 } from './utils/canvas';
 import { jsPDF } from 'jspdf';
-import { saveProject, loadProject, listProjects, deleteProject, getAuthUser, setAuthUser, clearAuthUser, signupUser, loginUser } from './utils/db';
+import { saveProject, loadProject, listProjects, deleteProject, getSession, signupUser, loginUser, logoutUser, isSupabaseReady } from './utils/db';
 
 // ============================================================
 const FONTS = ['Inter Tight','Roboto','Open Sans','Montserrat','Playfair Display','Poppins','Lato','Raleway','Merriweather','Nunito'];
@@ -52,7 +52,7 @@ function App() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [ctxMenu, setCtxMenu] = useState(null); // { x, y, layer }
   const [projectName, setProjectName] = useState('Sin titulo');
-  const [user, setUser] = useState(() => getAuthUser());
+  const [user, setUser] = useState(null);
   const [authScreen, setAuthScreen] = useState(null); // 'login' | 'signup' | 'dashboard'
   const [authEmail, setAuthEmail] = useState('');
   const [authPass, setAuthPass] = useState('');
@@ -682,17 +682,22 @@ function App() {
   }, [slides, renderSlideToCanvas]);
 
   // ---- Auth helpers ----
-  const handleLogin = () => {
-    const u = loginUser(authEmail, authPass);
-    if (!u) { setAuthError('Email o contraseña incorrectos'); return; }
-    setUser(u); setAuthScreen(null); setAuthError('');
+  const handleLogin = async () => {
+    try {
+      const u = await loginUser(authEmail, authPass);
+      if (!u) { setAuthError('Email o contraseña incorrectos'); return; }
+      setUser(u); setAuthScreen(null); setAuthError('');
+    } catch { setAuthError('Credenciales invalidas'); }
   };
-  const handleSignup = () => {
-    const u = signupUser(authEmail, authPass, authName);
-    if (!u) { setAuthError('El email ya esta registrado'); return; }
-    setUser(u); setAuthScreen(null); setAuthError('');
+  const handleSignup = async () => {
+    try {
+      const u = await signupUser(authEmail, authPass, authName);
+      if (!u) { setAuthError('El email ya esta registrado'); return; }
+      setAuthError('Cuenta creada. Revisa tu email para confirmar.');
+    } catch { setAuthError('Error al crear cuenta'); }
   };
-  const handleLogout = () => { clearAuthUser(); setUser(null); setAuthScreen(null); };
+  const handleLogout = async () => { await logoutUser(); setUser(null); setAuthScreen(null); };
+  useEffect(() => { getSession().then(u => { if (u) setUser(u); }); }, []);
 
   // ---- Auto-save (debounced, only in editor) ----
   const saveTimerRef = useRef(null);
@@ -1425,6 +1430,12 @@ function AuthDashboard({ user, savedList, onRefresh, onLogout, onOpen, onNew }) 
       <main style={{flex:1,display:'flex',flexDirection:'column',maxWidth:800,margin:'0 auto',padding:'40px 24px',width:'100%'}}>
         <h2 style={{fontSize:28,fontWeight:700,marginBottom:8,color:'var(--text-pri)'}}>Mis proyectos</h2>
         <p style={{fontSize:14,color:'var(--text-sec)',marginBottom:24}}>{savedList.length} proyecto{savedList.length !== 1 ? 's' : ''}</p>
+        {!isSupabaseReady() && (
+          <div style={{background:'rgba(245,158,11,0.1)',border:'1px solid var(--accent-orange)',borderRadius:'var(--radius-md)',padding:'14px 18px',marginBottom:20}}>
+            <p style={{fontSize:13,color:'var(--text-pri)',fontWeight:600, marginBottom:4}}>Configura Supabase</p>
+            <p style={{fontSize:12,color:'var(--text-sec)',marginBottom:8}}>Agrega <strong>VITE_SUPABASE_URL</strong> y <strong>VITE_SUPABASE_ANON_KEY</strong> en Vercel (Settings > Environment Variables). Despues redeploy.</p>
+          </div>
+        )}
         <button className="btn-hero btn-primary" onClick={onNew} style={{marginBottom:24,alignSelf:'flex-start'}}>+ Nuevo proyecto</button>
         {savedList.length === 0 && (
           <p style={{fontSize:15,color:'var(--text-mut)',textAlign:'center',marginTop:60}}>Aun no tienes proyectos guardados</p>

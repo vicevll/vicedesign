@@ -1,83 +1,70 @@
-const DB_NAME = 'ViceDesignDB';
-const DB_VER = 1;
+import { createClient } from '@supabase/supabase-js'
 
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VER);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('projects')) {
-        db.createObjectStore('projects', { keyPath: 'id' });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+
+export const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
+
+export function isSupabaseReady() {
+  return !!supabase
 }
 
+// === Auth ===
+export async function signupUser(email, password, name) {
+  if (!supabase) return null
+  const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } })
+  if (error) throw error
+  return data?.user ? { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name || '' } : null
+}
+
+export async function loginUser(email, password) {
+  if (!supabase) return null
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) throw error
+  return data?.user ? { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name || '' } : null
+}
+
+export async function getSession() {
+  if (!supabase) return null
+  const { data } = await supabase.auth.getSession()
+  return data?.session?.user ? { id: data.session.user.id, email: data.session.user.email, name: data.session.user.user_metadata?.full_name || '' } : null
+}
+
+export async function logoutUser() {
+  if (supabase) await supabase.auth.signOut()
+}
+
+// === Projects ===
 export async function saveProject(project) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('projects', 'readwrite');
-    tx.objectStore('projects').put({ ...project, updatedAt: Date.now() });
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  if (!supabase) return
+  const session = await supabase.auth.getSession()
+  const userId = session?.data?.session?.user?.id
+  if (!userId) return
+  const { data: existing } = await supabase.from('projects').select('id').eq('user_id', userId).eq('id', project.id).maybeSingle()
+  if (existing) {
+    await supabase.from('projects').update({ name: project.name, slides: JSON.stringify(project.slides), updated_at: new Date().toISOString() }).eq('id', project.id)
+  } else {
+    await supabase.from('projects').insert({ id: project.id, user_id: userId, name: project.name, slides: JSON.stringify(project.slides), updated_at: new Date().toISOString() })
+  }
 }
 
 export async function loadProject(id) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('projects', 'readonly');
-    const req = tx.objectStore('projects').get(id);
-    req.onsuccess = () => resolve(req.result || null);
-    req.onerror = () => reject(req.error);
-  });
+  if (!supabase) return null
+  const { data } = await supabase.from('projects').select('*').eq('id', id).maybeSingle()
+  if (!data) return null
+  return { id: data.id, name: data.name, slides: typeof data.slides === 'string' ? JSON.parse(data.slides) : data.slides, updatedAt: new Date(data.updated_at).getTime() }
 }
 
 export async function listProjects() {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('projects', 'readonly');
-    const req = tx.objectStore('projects').getAll();
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = () => reject(req.error);
-  });
+  if (!supabase) return []
+  const session = await supabase.auth.getSession()
+  const userId = session?.data?.session?.user?.id
+  if (!userId) return []
+  const { data } = await supabase.from('projects').select('*').eq('user_id', userId).order('updated_at', { ascending: false })
+  return (data || []).map(p => ({ id: p.id, name: p.name, slides: typeof p.slides === 'string' ? JSON.parse(p.slides) : p.slides, slidesCount: p.slides?.length || 1, updatedAt: new Date(p.updated_at).getTime() }))
 }
 
 export async function deleteProject(id) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('projects', 'readwrite');
-    tx.objectStore('projects').delete(id);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-// Auth (simulated - for demo only)
-export function getAuthUser() {
-  try { return JSON.parse(localStorage.getItem('vd_user') || 'null'); } catch { return null; }
-}
-export function setAuthUser(user) {
-  localStorage.setItem('vd_user', JSON.stringify(user));
-}
-export function clearAuthUser() {
-  localStorage.removeItem('vd_user');
-}
-export function signupUser(email, password, name) {
-  const users = JSON.parse(localStorage.getItem('vd_users') || '[]');
-  if (users.find(u => u.email === email)) return null;
-  const user = { id: 'u_' + Date.now(), email, password, name, createdAt: Date.now() };
-  users.push(user);
-  localStorage.setItem('vd_users', JSON.stringify(users));
-  setAuthUser(user);
-  return user;
-}
-export function loginUser(email, password) {
-  const users = JSON.parse(localStorage.getItem('vd_users') || '[]');
-  const user = users.find(u => u.email === email && u.password === password);
-  if (!user) return null;
-  setAuthUser(user);
-  return user;
+  if (!supabase) return
+  await supabase.from('projects').delete().eq('id', id)
 }
