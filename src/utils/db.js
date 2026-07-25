@@ -19,16 +19,22 @@ export function isSupabaseReady() {
 
 // === Auth ===
 export async function signupUser(email, password, name) {
-  if (!supabase) return null
+  if (!supabase) return null // No configurado
   const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } })
-  if (error) throw error
+  if (error) {
+    if (error.message?.includes('already') || error.message?.includes('exists')) return false
+    throw error
+  }
   return data?.user ? { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name || '' } : null
 }
 
 export async function loginUser(email, password) {
   if (!supabase) return null
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  if (error) throw error
+  if (error) {
+    if (error.message?.includes('Invalid') || error.message?.includes('invalid')) return false
+    throw error
+  }
   return data?.user ? { id: data.user.id, email: data.user.email, name: data.user.user_metadata?.full_name || '' } : null
 }
 

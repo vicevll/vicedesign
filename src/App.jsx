@@ -682,20 +682,22 @@ function App() {
   }, [slides, renderSlideToCanvas]);
 
   // ---- Auth helpers ----
-  const handleLogin = async () => {
-    try {
-      const u = await loginUser(authEmail, authPass);
-      if (!u) { setAuthError('Email o contraseña incorrectos'); return; }
-      setUser(u); setAuthScreen('dashboard'); setAuthError('');
-    } catch { setAuthError('Credenciales invalidas'); }
-  };
   const handleSignup = async () => {
     try {
       const u = await signupUser(authEmail, authPass, authName);
-      if (!u) { setAuthError('El email ya esta registrado'); return; }
-      if (u.id) { setUser(u); setAuthScreen('dashboard'); setAuthError(''); }
+      if (u === null) { setAuthError('Supabase no configurado. Agrega las variables de entorno en Vercel.'); return; }
+      if (u === false) { setAuthError('El email ya esta registrado'); return; }
+      if (u?.id) { setUser(u); setAuthScreen('dashboard'); setAuthError(''); }
       else { setAuthError('Cuenta creada. Revisa tu email para confirmar.'); }
-    } catch { setAuthError('Error al crear cuenta'); }
+    } catch (e) { setAuthError(e?.message || 'Error al crear cuenta'); }
+  };
+  const handleLogin = async () => {
+    try {
+      const u = await loginUser(authEmail, authPass);
+      if (u === null) { setAuthError('Supabase no configurado. Agrega las variables de entorno en Vercel.'); return; }
+      if (u === false) { setAuthError('Email o contraseña incorrectos'); return; }
+      setUser(u); setAuthScreen('dashboard'); setAuthError('');
+    } catch (e) { setAuthError(e?.message || 'Error al iniciar sesion'); }
   };
   const handleLogout = async () => { await logoutUser(); setUser(null); setAuthScreen(null); };
   const handleGoogleLogin = async () => {
